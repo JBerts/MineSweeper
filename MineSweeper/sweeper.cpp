@@ -15,7 +15,8 @@ Sweeper::Sweeper(const Board &board)
 bool
 Sweeper::solve(bool showProgress)
 {
-    while (m_checked + m_flagged < m_board.size())
+	int unsolved = m_board.size();
+    while (unsolved > 0)
     {
         // Make a guess
         int x, y;
@@ -24,30 +25,51 @@ Sweeper::solve(bool showProgress)
             x = m_rnd.x();
             y = m_rnd.y();
         } while (m_tiles[x][y].checked || m_tiles[x][y].flagged);
+        ++m_guessed;
 
         if (!check(x, y))
             return false;
+
+        --unsolved;
+    	cout << "Pheu, lucky guess, " << unsolved << " left\n";
+    	if (unsolved == 0)
+    		break;
 
         bool stuck = false;
         while (!stuck)
         {
             int blanksSolved = solveBlanks();
-            int singlesSolved = solveSingles();
+            unsolved -= blanksSolved;
             if (showProgress)
             {
-            	cout << "Solved " << blanksSolved + singlesSolved << " singles\n";
+            	cout << "Solved " << blanksSolved << " blanks, " << unsolved << " left\n";
                 dump();
             }
+        	if (unsolved == 0)
+        		break;
 
-            if (blanksSolved == 0 && singlesSolved == 0)
+            int singlesSolved = solveSingles();
+            unsolved -= singlesSolved;
+            if (showProgress)
+            {
+            	cout << "Solved " << singlesSolved << " singles, " << unsolved << " left\n";
+                dump();
+            }
+        	if (unsolved == 0)
+        		break;
+
+            if (unsolved > 0 && blanksSolved == 0 && singlesSolved == 0)
             {
                 int restrictedSolved = solveRestricted();
+                unsolved -= restrictedSolved;
                 if (showProgress)
                 {
-                	cout << "Solved " << restrictedSolved << " restricted\n";
+                	cout << "Solved " << restrictedSolved << " restricted, " << unsolved << " left\n";
                     dump();
                 }
-                if (restrictedSolved == 0)
+            	if (unsolved == 0)
+            		break;
+            	if (restrictedSolved == 0)
                     stuck = true;
             }
         }
@@ -59,8 +81,11 @@ Sweeper::solve(bool showProgress)
 bool
 Sweeper::check(int x, int y)
 {
-    ++m_checked;
+	if (m_tiles[x][y].checked)
+		return true;
+
     auto n = m_board.check(x, y);
+    ++m_checked;
     if (n < 0)
         return false;
 
@@ -106,6 +131,11 @@ vector<pair<int, int>>
 Sweeper::getAdjecent(int x, int y, function<bool(const TileInfo&)> pred) const
 {
     vector<pair<int, int>> adjecent;
+
+    if (y > 0 && pred(m_tiles[x][y - 1]))
+        adjecent.push_back(make_pair(x, y - 1));
+    if (y < m_board.getHeight() - 1 && pred(m_tiles[x][y + 1]))
+        adjecent.push_back(make_pair(x, y + 1));
     if (x > 0)
     {
         if (pred(m_tiles[x - 1][y]))
@@ -124,10 +154,6 @@ Sweeper::getAdjecent(int x, int y, function<bool(const TileInfo&)> pred) const
         if (y < m_board.getHeight() - 1 && pred(m_tiles[x + 1][y + 1]))
             adjecent.push_back(make_pair(x + 1, y + 1));
     }
-    if (y > 0 && pred(m_tiles[x][y - 1]))
-        adjecent.push_back(make_pair(x, y - 1));
-    if (y < m_board.getHeight() - 1 && pred(m_tiles[x][y + 1]))
-        adjecent.push_back(make_pair(x, y + 1));
 
     return adjecent;
 }
@@ -166,7 +192,7 @@ Sweeper::solveSingles()
                 continue;
 
             int flagged = countAdjecent(x, y, [](const TileInfo& ti) { return ti.flagged; });
-            int unchecked = countAdjecent(x, y, [](const TileInfo& ti) { return !ti.checked; });
+            int unchecked = countAdjecent(x, y, [](const TileInfo& ti) { return !ti.checked && !ti.flagged; });
 
             if (flagged == ti.adjecentMines && unchecked > 0)
                 checkAdjecent(x, y);
@@ -175,7 +201,7 @@ Sweeper::solveSingles()
                 for (auto [x2, y2] : getAdjecent(x, y))
                 {
                     auto &ti2 = m_tiles[x2][y2];
-                    if (!ti2.checked)
+                    if (!ti2.checked && !ti2.flagged)
                     {
                         ti2.flagged = true;
                         ti2.restricted = false;

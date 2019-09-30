@@ -13,18 +13,18 @@ using namespace std;
 int main()
 {
     cout << "Minesweeper!" << endl;
-    auto board = Board(16, 16, 20);
+    auto board = Board(16, 16, 40);
     auto solver = Sweeper(board);
     auto ok = solver.solve(true);
     if (ok)
     {
-        cout << "\nSuccess :-)\n";
+        cout << "\nSuccess :-) " << solver.getGuessedCount() << " guesses\n";
         return 0;
     }
     else
     {
         cout << "\nFail :-(\n";
-        cout << "Found " << solver.getFlagged() << " of "
+        cout << "Found " << solver.getFlaggedCount() << " of "
             << board.getNumMines() << " mines.\n";
         cout << "Solution:\n";
         board.dump();

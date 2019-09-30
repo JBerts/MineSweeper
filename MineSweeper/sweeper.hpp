@@ -17,8 +17,9 @@ public:
     int solveSingles();
     int solveRestricted();
 
-    int getChecked() const { return m_checked; }
-    int getFlagged() const { return m_flagged; }
+    int getCheckedCount() const { return m_checked; }
+    int getFlaggedCount() const { return m_flagged; }
+    int getGuessedCount() const { return m_guessed; }
 
     void dump();
 
@@ -45,6 +46,7 @@ private:
     std::vector<std::vector<TileInfo>> m_tiles;
     int m_checked = 0;
     int m_flagged = 0;
+    int m_guessed = 0;
     std::vector<std::pair<int, int>> m_blanks;
     std::vector<std::vector<std::pair<int, int>>> m_restrictedGroups;
 };
