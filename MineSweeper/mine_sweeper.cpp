@@ -3,6 +3,7 @@
 
 #include "pch.h"
 #include <iostream>
+#include <string>
 
 #include "board.hpp"
 #include "sweeper.hpp"
@@ -12,11 +13,21 @@ using namespace std;
 int main()
 {
     cout << "Minesweeper!" << endl;
-    auto board = Board(16, 16, 40);
-
+    auto board = Board(16, 16, 20);
     auto solver = Sweeper(board);
-    bool ok = solver.solve();
-    cout << (ok ? "Success!" : "Failed!") << endl;
-    solver.dump();
-    board.dump();
+    auto ok = solver.solve(true);
+    if (ok)
+    {
+        cout << "\nSuccess :-)\n";
+        return 0;
+    }
+    else
+    {
+        cout << "\nFail :-(\n";
+        cout << "Found " << solver.getFlagged() << " of "
+            << board.getNumMines() << " mines.\n";
+        cout << "Solution:\n";
+        board.dump();
+        return 1;
+    }
 }

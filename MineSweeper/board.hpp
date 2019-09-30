@@ -11,6 +11,8 @@ public:
     int getWidth() const { return m_width; }
     int getHeight() const { return m_height; }
 
+    int getNumMines() const { return m_mineCount; }
+
     int check(int x, int y) const;
     void dump();
 
