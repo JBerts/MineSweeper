@@ -34,14 +34,21 @@ Sweeper::solve(bool showProgress)
             int blanksSolved = solveBlanks();
             int singlesSolved = solveSingles();
             if (showProgress)
+            {
+            	cout << "Solved " << blanksSolved + singlesSolved << " singles\n";
                 dump();
+            }
 
             if (blanksSolved == 0 && singlesSolved == 0)
             {
-                if (solveRestricted() == 0)
-                    stuck = true;
-                else if (showProgress)
+                int restrictedSolved = solveRestricted();
+                if (showProgress)
+                {
+                	cout << "Solved " << restrictedSolved << " restricted\n";
                     dump();
+                }
+                if (restrictedSolved == 0)
+                    stuck = true;
             }
         }
     }
@@ -58,13 +65,17 @@ Sweeper::check(int x, int y)
         return false;
 
     m_tiles[x][y].checked = true;
+    m_tiles[x][y].restricted = false;
     m_tiles[x][y].adjecentMines = n;
     if (n == 0)
         m_blanks.push_back(make_pair(x, y));
     else
     {
-        auto unchecked = getAdjecent(x, y, [](const TileInfo& ti) { return !ti.checked; });
-        for (auto [x, y] : unchecked)
+        auto adjecent = getAdjecent(
+        		x, y,
+				[](const TileInfo& ti)
+				{ return !ti.checked && !ti.flagged; });
+        for (auto [x, y] : adjecent)
             m_tiles[x][y].restricted = true;
     }
 
@@ -167,6 +178,7 @@ Sweeper::solveSingles()
                     if (!ti2.checked)
                     {
                         ti2.flagged = true;
+                        ti2.restricted = false;
                         ++m_flagged;
                     }
                 }
@@ -194,41 +206,45 @@ void
 Sweeper::groupRestricted()
 {
     m_restrictedGroups.clear();
-    int currentGroup = -1;
+    for (int x = 0; x < m_board.getWidth(); x++)
+    {
+        for (int y = 0; y < m_board.getHeight(); y++)
+        {
+        	m_tiles[x][y].restrictedGroup = -1;
+        }
+    }
+
     for (int x = 0; x < m_board.getWidth(); x++)
     {
         for (int y = 0; y < m_board.getHeight(); y++)
         {
             auto &ti = m_tiles[x][y];
-            if (!ti.checked && ti.restricted && ti.restrictedGroup < 0)
+            if (!ti.checked && !ti.flagged && ti.restricted && ti.restrictedGroup < 0)
             {
                 ti.restrictedGroup = m_restrictedGroups.size();
                 m_restrictedGroups.emplace_back();
                 m_restrictedGroups.back().push_back(make_pair(x, y));
-                followRestricted(x, y);
+                followRestricted(x, y, ti.restrictedGroup);
+                cout << "Created group " << ti.restrictedGroup << " with " << m_restrictedGroups.back().size() << "\n";
             }
         }
     }
 }
 
 int
-Sweeper::followRestricted(int x, int y)
+Sweeper::followRestricted(int x, int y, int group)
 {
-    auto &ti = m_tiles[x][y];
-    if (ti.checked || !ti.restricted)
-        return 0;
-
     auto adjecent = getAdjecent(
         x, y, 
-        [ti](const TileInfo& ti2) 
+        [group](const TileInfo& ti)
         { 
-            return ti2.restricted && ti.restrictedGroup != ti2.restrictedGroup; 
+            return !ti.checked && !ti.flagged && ti.restricted && ti.restrictedGroup != group;
         });
     for (auto[x2, y2] : adjecent)
     {
-        m_tiles[x2][y2].restrictedGroup = ti.restrictedGroup;
-        m_restrictedGroups.at(ti.restrictedGroup).push_back(make_pair(x2, y2));
-        followRestricted(x2, y2);
+        m_tiles[x2][y2].restrictedGroup = group;
+        m_restrictedGroups.at(group).push_back(make_pair(x2, y2));
+        followRestricted(x2, y2, group);
     }
     return adjecent.size();
 }
@@ -240,15 +256,19 @@ Sweeper::dump()
     {
         for (int x = 0; x < m_board.getWidth(); ++x)
         {
-            if (m_tiles[x][y].flagged)
+            auto &ti = m_tiles[x][y];
+
+            if (ti.flagged)
                 cout << '*';
-            else if (m_tiles[x][y].checked)
+            else if (ti.checked)
             {
-                if (m_tiles[x][y].adjecentMines == 0)
+                if (ti.adjecentMines == 0)
                     cout << '.';
                 else
-                    cout << m_tiles[x][y].adjecentMines;
+                    cout << ti.adjecentMines;
             }
+            else if (ti.restricted)
+                cout << "\x1b[" << 42 + ti.restrictedGroup << "m?" << "\x1b[0m";
             else
                 cout << '?';
         }

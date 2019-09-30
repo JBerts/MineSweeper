@@ -38,7 +38,7 @@ private:
     std::vector<std::pair<int, int>> getAdjecent(int x, int y, std::function<bool(const TileInfo&)> pred) const;
     int countAdjecent(int x, int y, std::function<bool(const TileInfo&)> pred) const;
     void groupRestricted();
-    int followRestricted(int x, int y);
+    int followRestricted(int x, int y, int group);
 
     const Board &m_board;
     RndGen m_rnd;

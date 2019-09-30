@@ -11,13 +11,13 @@ RndGen::RndGen(int maxX, int maxY)
 }
 
 int 
-RndGen::x() const
+RndGen::x()
 {
     return m_rndX(m_re);
 }
 
 int 
-RndGen::y() const
+RndGen::y()
 {
     return m_rndY(m_re);
 }
