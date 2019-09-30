@@ -31,7 +31,8 @@ Sweeper::solve(bool showProgress)
             return false;
 
         --unsolved;
-    	cout << "Pheu, lucky guess, " << unsolved << " left\n";
+        if (showProgress)
+        	cout << "Pheu, lucky guess, " << unsolved << " left\n";
     	if (unsolved == 0)
     		break;
 
@@ -251,7 +252,6 @@ Sweeper::groupRestricted()
                 m_restrictedGroups.emplace_back();
                 m_restrictedGroups.back().push_back(make_pair(x, y));
                 followRestricted(x, y, ti.restrictedGroup);
-                cout << "Created group " << ti.restrictedGroup << " with " << m_restrictedGroups.back().size() << "\n";
             }
         }
     }
