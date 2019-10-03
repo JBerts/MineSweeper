@@ -1,6 +1,8 @@
 #include "pch.h"
 #include "sweeper.hpp"
 
+#include <cmath>
+#include <iomanip>
 #include <iostream>
 
 using namespace std;
@@ -8,14 +10,16 @@ using namespace std;
 Sweeper::Sweeper(const Board &board)
     : m_board(board),
       m_rnd(board.getWidth() - 1, board.getHeight() - 1),
-      m_tiles(m_board.getWidth(), vector<TileInfo>(m_board.getHeight()))
+      m_tiles(m_board.getWidth(), vector<TileInfo>(m_board.getHeight())),
+      m_showProgress(false)
 {
 }
 
 bool
 Sweeper::solve(bool showProgress)
 {
-	int unsolved = m_board.size();
+    m_showProgress = showProgress;
+    int unsolved = m_board.size();
     while (unsolved > 0)
     {
         // Make a guess
@@ -32,9 +36,9 @@ Sweeper::solve(bool showProgress)
 
         --unsolved;
         if (showProgress)
-        	cout << "Pheu, lucky guess, " << unsolved << " left\n";
-    	if (unsolved == 0)
-    		break;
+            cout << "Pheu, lucky guess, " << unsolved << " left\n";
+        if (unsolved == 0)
+            break;
 
         bool stuck = false;
         while (!stuck)
@@ -43,21 +47,21 @@ Sweeper::solve(bool showProgress)
             unsolved -= blanksSolved;
             if (showProgress)
             {
-            	cout << "Solved " << blanksSolved << " blanks, " << unsolved << " left\n";
+                cout << "Solved " << blanksSolved << " blanks, " << unsolved << " left\n";
                 dump();
             }
-        	if (unsolved == 0)
-        		break;
+            if (unsolved == 0)
+                break;
 
             int singlesSolved = solveSingles();
             unsolved -= singlesSolved;
             if (showProgress)
             {
-            	cout << "Solved " << singlesSolved << " singles, " << unsolved << " left\n";
+                cout << "Solved " << singlesSolved << " singles, " << unsolved << " left\n";
                 dump();
             }
-        	if (unsolved == 0)
-        		break;
+            if (unsolved == 0)
+                break;
 
             if (unsolved > 0 && blanksSolved == 0 && singlesSolved == 0)
             {
@@ -65,12 +69,12 @@ Sweeper::solve(bool showProgress)
                 unsolved -= restrictedSolved;
                 if (showProgress)
                 {
-                	cout << "Solved " << restrictedSolved << " restricted, " << unsolved << " left\n";
+                    cout << "Solved " << restrictedSolved << " restricted, " << unsolved << " left\n";
                     dump();
                 }
-            	if (unsolved == 0)
-            		break;
-            	if (restrictedSolved == 0)
+                if (unsolved == 0)
+                    break;
+                if (restrictedSolved == 0)
                     stuck = true;
             }
         }
@@ -82,8 +86,8 @@ Sweeper::solve(bool showProgress)
 bool
 Sweeper::check(int x, int y)
 {
-	if (m_tiles[x][y].checked)
-		return true;
+    if (m_tiles[x][y].checked)
+        return true;
 
     auto n = m_board.check(x, y);
     ++m_checked;
@@ -98,9 +102,9 @@ Sweeper::check(int x, int y)
     else
     {
         auto adjecent = getAdjecent(
-        		x, y,
-				[](const TileInfo& ti)
-				{ return !ti.checked && !ti.flagged; });
+                x, y,
+                [](const TileInfo& ti)
+                { return !ti.checked && !ti.flagged; });
         for (auto [x, y] : adjecent)
             m_tiles[x][y].restricted = true;
     }
@@ -218,15 +222,29 @@ Sweeper::solveSingles()
 int
 Sweeper::solveRestricted()
 {
+    int checkedBefore = m_checked;
+
     groupRestricted();
     for (auto &restricted : m_restrictedGroups)
     {
+        if (m_showProgress)
+        {
+          cout << "Hmm, " << fixed << setprecision(0) << pow(2, restricted.size())
+               << " possible solutions to check. This might take a while...\n";
+        }
+
+        vector<bool> path;
+        int valid = testRestricted(path, restricted);
+        if (m_showProgress)
+            cout << "\nValid solutions: " << valid << "\n";
         for (auto [x, y] : restricted)
         {
-
+            if (m_tiles[x][y].restrictedSolutionMines == 0)
+                check(x, y);
         }
     }
-    return 0;
+
+    return m_checked - checkedBefore;
 }
     
 void
@@ -237,7 +255,7 @@ Sweeper::groupRestricted()
     {
         for (int y = 0; y < m_board.getHeight(); y++)
         {
-        	m_tiles[x][y].restrictedGroup = -1;
+            m_tiles[x][y].restrictedGroup = -1;
         }
     }
 
@@ -250,7 +268,7 @@ Sweeper::groupRestricted()
             {
                 ti.restrictedGroup = m_restrictedGroups.size();
                 m_restrictedGroups.emplace_back();
-                m_restrictedGroups.back().push_back(make_pair(x, y));
+                m_restrictedGroups.back().emplace_back(x, y);
                 followRestricted(x, y, ti.restrictedGroup);
             }
         }
@@ -261,18 +279,89 @@ int
 Sweeper::followRestricted(int x, int y, int group)
 {
     auto adjecent = getAdjecent(
-        x, y, 
+        x, y,
         [group](const TileInfo& ti)
-        { 
+        {
             return !ti.checked && !ti.flagged && ti.restricted && ti.restrictedGroup != group;
         });
-    for (auto[x2, y2] : adjecent)
+    for (auto [x2, y2] : adjecent)
     {
-        m_tiles[x2][y2].restrictedGroup = group;
-        m_restrictedGroups.at(group).push_back(make_pair(x2, y2));
+        auto &ti = m_tiles[x2][y2];
+        if (ti.checked || ti.flagged || !ti.restricted || ti.restrictedGroup == group)
+            continue;
+
+        ti.restrictedGroup = group;
+        m_restrictedGroups.at(group).emplace_back(x2, y2);
         followRestricted(x2, y2, group);
     }
     return adjecent.size();
+}
+
+int
+Sweeper::testRestricted(vector<bool> &path, const vector<pair<int, int>> &restricted)
+{
+    int valid = 0;
+    if (path.size() == restricted.size())
+    {
+        auto pit = path.begin();
+        for(auto rit = restricted.begin(); rit != restricted.end(); ++rit)
+        {
+            auto [x, y] = *rit;
+            m_tiles[x][y].testMine = *pit++;
+        }
+        valid += verifyRestricted(restricted) ? 1 : 0;
+    }
+    else
+    {
+        path.push_back(true);
+        valid += testRestricted(path, restricted);
+        path.pop_back();
+        path.push_back(false);
+        valid += testRestricted(path, restricted);
+        path.pop_back();
+    }
+
+    return valid;
+}
+
+bool
+Sweeper::verifyRestricted(const vector<pair<int, int>> &restricted)
+{
+    if (m_showProgress)
+    {
+        cout << "\b";
+        static int i = 0;
+        switch (i++ % 3)
+        {
+        case 0: cout << '-'; break;
+        case 1: cout << '/'; break;
+        case 2: cout << '\\'; break;
+        }
+    }
+    bool ok = true;
+    for (auto [x, y] : restricted)
+    {
+        auto adjChecked = getAdjecent(x, y, [](const TileInfo &ti){ return ti.checked; });
+        for (auto [x2, y2] : adjChecked)
+        {
+            int flagged = countAdjecent(x2, y2, [](const TileInfo& ti) { return ti.flagged; });
+            int testMines = countAdjecent(x2, y2, [](const TileInfo &ti){ return ti.testMine; });
+            if (flagged + testMines != m_tiles[x2][y2].adjecentMines)
+            {
+                ok = false;
+                break;
+            }
+        }
+        if (!ok)
+            break;
+    }
+
+    if (ok)
+    {
+        for (auto [x, y] : restricted)
+            m_tiles[x][y].restrictedSolutionMines += m_tiles[x][y].testMine;
+    }
+    return ok;
 }
 
 void
@@ -294,7 +383,11 @@ Sweeper::dump()
                     cout << ti.adjecentMines;
             }
             else if (ti.restricted)
-                cout << "\x1b[" << 42 + ti.restrictedGroup << "m?" << "\x1b[0m";
+            {
+                cout << "\x1b[37m\x1b[" << 42 + ti.restrictedGroup << "m";
+                cout << ti.restrictedSolutionMines;
+                cout << "\x1b[0m";
+            }
             else
                 cout << '?';
         }
