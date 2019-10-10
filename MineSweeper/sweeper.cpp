@@ -225,6 +225,12 @@ Sweeper::solveRestricted()
     int checkedBefore = m_checked;
 
     groupRestricted();
+    if (m_showProgress)
+    {
+        cout << "Found " << m_restrictedGroups.size()
+             << " groups of restricted\n";
+        dump();
+    }
     for (auto &restricted : m_restrictedGroups)
     {
         if (m_showProgress)
@@ -256,6 +262,7 @@ Sweeper::groupRestricted()
         for (int y = 0; y < m_board.getHeight(); y++)
         {
             m_tiles[x][y].restrictedGroup = -1;
+            m_tiles[x][y].restrictedSolutionMines = 0;
         }
     }
 
